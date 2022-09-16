@@ -95,16 +95,16 @@ public class Worker : BackgroundService {
         }
     }
 
-    // public override Task StopAsync(CancellationToken cancellationToken) {
-    //     _logger.LogInformation("-------------------- Stopping Service --------------------");
-    //
-    //     foreach (YoutubeDLP client in _downloadClients) {
-    //         client.CancelDownload();
-    //         while (client.IsDownloading)
-    //             Thread.Sleep(50);
-    //     }
-    //
-    //     _logger.LogInformation("-------------------- Stopped Service --------------------");
-    //     return Task.CompletedTask;
-    // }
+    public override Task StopAsync(CancellationToken cancellationToken) {
+        _logger.LogInformation("-------------------- Stopping Service --------------------");
+    
+        foreach (YoutubeDLP client in _downloadClients) {
+            client.CancelDownload();
+            while (client.IsDownloading)
+                Thread.Sleep(50);
+        }
+    
+        _logger.LogInformation("-------------------- Stopped Service --------------------");
+        return Task.CompletedTask;
+    }
 }
