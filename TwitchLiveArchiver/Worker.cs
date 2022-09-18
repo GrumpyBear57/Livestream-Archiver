@@ -26,6 +26,11 @@ public class Worker : BackgroundService {
 
     private void StartDownload(string channel) {
         YoutubeDLP downloader = new YoutubeDLP(_config["YouTubeDL:ExecutablePath"]);
+        // By default, assume that the ffmpeg binary is in the same directory as the ytdlp binary, otherwise read from config file
+        downloader.Options.PostProcessingOptions.FfmpegLocation = string.IsNullOrEmpty(_config["YouTubeDL:FFmpegPath"])
+            ? Path.GetDirectoryName(_config["YouTubeDL:ExecutablePath"])
+            : _config["YouTubeDL:FFmpegPath"];
+
         downloader.StandardOutputEvent += (_, output) => _logger.LogInformation("Youtube-DLP: {Output}", output);
         downloader.StandardErrorEvent  += (_, error) => _logger.LogTrace("Youtube-DLP: {Error}", error);
 
@@ -35,15 +40,10 @@ public class Worker : BackgroundService {
 
         string outputFile = Path.Join(outputDir, $"{channel} - {DateTime.Now:yyyy-MM-dd hhmmss}.mp4");
         downloader.Options.FilesystemOptions.Output = outputFile;
-        
+
         #pragma warning disable CS4014
         downloader.DownloadAsync($"https://twitch.tv/{channel}");
         #pragma warning restore CS4014
-        
-        // downloader.DownloadAsync($"https://www.youtube.com/watch?v=t3oLeSPINOk");
-
-        // await Task.Delay(TimeSpan.FromSeconds(10));
-        // downloader.CancelDownload();
 
         _downloadClients.Add(downloader);
 
@@ -61,11 +61,6 @@ public class Worker : BackgroundService {
         };
 
         monitor.OnStreamUpdate += (_, args) => {
-            // _logger.LogDebug("{Channel} Uptime: {Uptime}, {Viewers} viewers", args.Channel,
-            //                  (DateTime.Now.ToUniversalTime() - args.Stream.StartedAt.ToUniversalTime()).ToString("g"),
-            //                  args.Stream.ViewerCount
-            //                 );
-            //
             if (_downloadClients.Exists(c => c.VideoUrl.Contains(args.Channel)) == false) {
                 _logger.LogWarning("No active downloads for {Channel}! Starting one now...", args.Channel);
                 StartDownload(args.Channel);
@@ -84,9 +79,7 @@ public class Worker : BackgroundService {
         while (!stoppingToken.IsCancellationRequested) {
             _logger.LogDebug("Running for: {Uptime}", (DateTime.Now - _startTime).ToString("g"));
             await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
-            List<string> toRemove = (from client in _downloadClients
-                                     where client.IsDownloading == false
-                                     select client.VideoUrl).ToList();
+            List<string> toRemove = (from client in _downloadClients where client.IsDownloading == false select client.VideoUrl).ToList();
             if (toRemove.Any() == false)
                 continue;
 
@@ -97,13 +90,13 @@ public class Worker : BackgroundService {
 
     public override Task StopAsync(CancellationToken cancellationToken) {
         _logger.LogInformation("-------------------- Stopping Service --------------------");
-    
+
         foreach (YoutubeDLP client in _downloadClients) {
             client.CancelDownload();
             while (client.IsDownloading)
                 Thread.Sleep(50);
         }
-    
+
         _logger.LogInformation("-------------------- Stopped Service --------------------");
         return Task.CompletedTask;
     }

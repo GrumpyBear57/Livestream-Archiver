@@ -1,0 +1,8 @@
+﻿version: "3.9"
+services: 
+  archiver:
+    container_name: livestream-archiver
+    image: livestream-archiver
+    volumes:
+      - ./appsettings.Docker.json:/app/appsettings.json
+      - Y:\Unsorted\Twitch\test:/app/downloads
